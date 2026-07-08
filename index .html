@@ -88,14 +88,6 @@ a{color:inherit;}
   display:flex;align-items:center;justify-content:space-between;gap:20px;
 }
 .brand{display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;}
-.brand-mark{
-  width:38px;height:38px;border-radius:10px;
-  background:radial-gradient(circle at 30% 20%, rgba(155,123,255,.5), rgba(10,8,20,.9) 70%);
-  border:1px solid var(--line);
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 18px rgba(155,123,255,.35);
-}
-.brand-mark svg{width:22px;height:22px;}
 .brand-name{font-family:'Cinzel',serif;font-weight:800;font-size:20px;letter-spacing:.04em;color:var(--text);}
 .brand-sub{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--text-faint);margin-top:1px;}
 
@@ -321,9 +313,6 @@ td input,td select{padding:7px 9px;font-size:13px;}
   .statics-grid{grid-template-columns:1fr;}
 }
 
-footer{border-top:1px solid var(--line-soft);padding:30px 0;text-align:center;color:var(--text-faint);font-size:12.5px;position:relative;}
-footer b{color:var(--gold);}
-
 @media(max-width:900px){
   .req-body{grid-template-columns:1fr;}
   .slot-grid{grid-template-columns:1fr 1fr;}
@@ -349,12 +338,6 @@ footer b{color:var(--gold);}
 <div class="topbar">
   <div class="topbar-inner">
     <div class="brand" onclick="goto('submit')">
-      <div class="brand-mark">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2L4 6V12C4 17 7.5 20.7 12 22C16.5 20.7 20 17 20 12V6L12 2Z" stroke="#d4af53" stroke-width="1.4"/>
-          <path d="M9 11L11 13L15.5 8.5" stroke="#d4af53" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
       <div>
         <div class="brand-name">JAILED</div>
         <div class="brand-sub">Guild Request Hub</div>
@@ -460,7 +443,7 @@ footer b{color:var(--gold);}
       <div class="panel" style="margin-top:16px;">
         <div class="field" style="margin-bottom:0;">
           <label>Additional Notes</label>
-          <textarea id="f-notes" placeholder="Anything else officers should know — priority reasoning, upcoming events, etc."></textarea>
+          <textarea id="f-notes"></textarea>
         </div>
       </div>
 
@@ -548,13 +531,10 @@ footer b{color:var(--gold);}
 <div class="view" id="view-admin">
   <div class="wrap">
     <div id="admin-gate" class="gate">
-      <div class="eyebrow" style="justify-content:center;">Officers Only</div>
-      <h2 style="font-size:26px;">Admin Access</h2>
       <div class="panel">
-        <div class="field"><label>Admin Key</label><input type="password" id="admin-pin" placeholder="Enter the ADMIN_KEY set on the Worker"></div>
-        <button class="btn btn-primary" style="width:100%;" onclick="checkPin()" id="admin-unlock-btn">Unlock Dashboard</button>
+        <div class="field"><input type="password" id="admin-pin" placeholder="Admin Key"></div>
+        <button class="btn btn-primary" style="width:100%;" onclick="checkPin()" id="admin-unlock-btn">Log In</button>
         <div id="pin-error" style="display:none;color:var(--bad);font-size:12.5px;margin-top:10px;">Incorrect key, or couldn't reach the server.</div>
-        <div class="note" style="margin-top:16px;margin-bottom:0;">This is the same <b style="color:var(--gold);">ADMIN_KEY</b> secret set on the Worker — it's checked against the server, not just stored in this page. Once entered, it's remembered on this device so you won't need to log in again here.</div>
       </div>
     </div>
 
@@ -720,10 +700,6 @@ footer b{color:var(--gold);}
   </div>
 </div>
 
-<footer>
-  <div class="wrap"><b>JAILED</b> — Guild Request Hub · Built for internal guild use · Data is shared across all members of this tool</div>
-</footer>
-
 <script>
 /* ============== constants ============== */
 // PASTE YOUR DEPLOYED WORKER URL HERE before hosting this file — e.g.
@@ -734,7 +710,7 @@ const WORKER_URL = "https://shrill-king-9fa6.mizzelle.workers.dev";
 
 const WEAPONS = ["— none —","Sword & Shield","Greatsword","Dagger","Wand","Staff","Crossbow","Longbow","Spear"];
 const ARMOR_SLOTS = ["Helmet","Top","Gloves","Bottom","Boots","Cloak"];
-const ACCESSORY_SLOTS = ["Necklace","Earring 1","Earring 2","Ring 1","Ring 2","Belt","Bracelet","Brooch"];
+const ACCESSORY_SLOTS = ["Necklace","Earring","Ring 1","Ring 2","Belt","Bracelet","Brooch"];
 // Not a real secret — baked into the page so ordinary member actions (new build, private
 // request) can write to the Worker without needing the real admin password. Must match the
 // SITE_KEY variable set on the Worker.
@@ -890,7 +866,7 @@ function slug(s){ return s.toLowerCase().replace(/\s+/g,'-'); }
 
 function initStatTotals(){
   document.getElementById('stat-totals').innerHTML = STAT_FIELDS.map(f=>
-    `<div class="field"><label>${f.label}</label><input type="text" id="st-${f.key}" placeholder="e.g. 60%"></div>`).join('');
+    `<div class="field"><label>${f.label}</label><input type="text" id="st-${f.key}"></div>`).join('');
 }
 function collectStatTotals(){
   const out = {};

@@ -143,6 +143,7 @@ a{color:inherit;}
   padding:26px;box-shadow:var(--shadow);backdrop-filter:blur(12px);
 }
 .panel + .panel{margin-top:16px;}
+a.panel:hover{border-color:var(--gold);}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
 
@@ -498,18 +499,15 @@ td input,td select{padding:7px 9px;font-size:13px;}
 
     <div class="section-head" style="margin:0 0 14px;">
       <h2 style="font-size:18px;">Live Boss &amp; Event Timers</h2>
-      <p>Pulled live from the T&amp;L Companion app — not something we maintain ourselves.</p>
+      <p>Maintained by the T&amp;L Companion app, not by us — it doesn't allow embedding, so it opens in its own tab.</p>
     </div>
-    <div class="panel" style="padding:0;overflow:hidden;margin-bottom:36px;">
-      <iframe id="companion-frame" src="https://tl-companionv1.takhisis11.workers.dev/" style="width:100%;height:720px;border:none;display:block;" loading="lazy" title="T&L Companion — live boss and event timers" onload="handleCompanionLoad()"></iframe>
-      <div id="companion-fallback" style="display:none;padding:26px;text-align:center;">
-        <p style="color:var(--text-dim);font-size:13.5px;margin:0 0 14px;">This site doesn't allow embedding, so it can't display inline here.</p>
-        <a class="btn btn-primary" href="https://tl-companionv1.takhisis11.workers.dev/" target="_blank" rel="noopener">Open T&amp;L Companion ↗</a>
+    <a href="https://tl-companionv1.takhisis11.workers.dev/" target="_blank" rel="noopener" class="panel" style="display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:36px;text-decoration:none;color:inherit;transition:.15s;">
+      <div>
+        <div style="font-family:'Cinzel',serif;font-weight:700;font-size:17px;color:var(--gold-bright);margin-bottom:4px;">T&amp;L Companion App</div>
+        <div style="color:var(--text-dim);font-size:13.5px;">Live field bosses, arch bosses, world events, and the day/night cycle</div>
       </div>
-    </div>
-    <div style="margin:-24px 0 36px;">
-      <a href="https://tl-companionv1.takhisis11.workers.dev/" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--text-faint);">Trouble loading above? Open it directly in a new tab ↗</a>
-    </div>
+      <span class="btn btn-primary" style="white-space:nowrap;">Open ↗</span>
+    </a>
 
     <div class="section-head" style="margin:0 0 14px;">
       <h2 style="font-size:18px;">Guild Events</h2>
@@ -1376,17 +1374,6 @@ async function renameStatic(staticIdx, value){
   renderPublicStatics();
 }
 
-/* ============== companion app embed ============== */
-let companionLoaded = false;
-function handleCompanionLoad(){ companionLoaded = true; }
-setTimeout(()=>{
-  if(!companionLoaded){
-    const frame = document.getElementById('companion-frame');
-    const fallback = document.getElementById('companion-fallback');
-    if(frame && fallback){ frame.style.display='none'; fallback.style.display='block'; }
-  }
-}, 4000);
-
 /* ============== discord instant pings ============== */
 const NOTIFY_AUTH = { build:'site', private:'site', loot:'admin', queue:'admin' };
 async function notifyDiscord(type, text){
@@ -1488,8 +1475,8 @@ async function testDiscordPost(){
     });
     const data = await res.json();
     status.style.display='block';
-    if(res.ok){ status.style.color='#8fe3b6'; status.textContent = '✓ Posted public schedule to Discord — check your channel.'; }
-    else { status.style.color='var(--bad)'; status.textContent = 'Failed: ' + (data.error || res.status); }
+    if(res.ok && data.ok){ status.style.color='#8fe3b6'; status.textContent = '✓ Posted public schedule to Discord — check your channel.'; }
+    else { status.style.color='var(--bad)'; status.textContent = 'Discord post failed: ' + (data.error || ('HTTP '+(data.status||res.status))); }
   }catch(e){
     status.style.display='block'; status.style.color='var(--bad)'; status.textContent = "Couldn't reach the worker.";
   }
@@ -1503,8 +1490,8 @@ async function testOfficerPost(){
     });
     const data = await res.json();
     status.style.display='block';
-    if(res.ok){ status.style.color='#8fe3b6'; status.textContent = '✓ Posted officer summary to Discord — check your officer channel.'; }
-    else { status.style.color='var(--bad)'; status.textContent = 'Failed: ' + (data.error || res.status); }
+    if(res.ok && data.ok){ status.style.color='#8fe3b6'; status.textContent = '✓ Posted officer summary to Discord — check your officer channel.'; }
+    else { status.style.color='var(--bad)'; status.textContent = 'Discord post failed: ' + (data.error || ('HTTP '+(data.status||res.status))); }
   }catch(e){
     status.style.display='block'; status.style.color='var(--bad)'; status.textContent = "Couldn't reach the worker.";
   }

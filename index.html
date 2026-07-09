@@ -221,6 +221,8 @@ textarea{resize:vertical;min-height:70px;}
 .chip-row{display:flex;flex-wrap:wrap;gap:6px;}
 .chip{background:rgba(8,6,18,.55);border:1px solid var(--line);padding:3px 9px;border-radius:6px;font-size:12px;}
 .chip.have{opacity:.55;text-decoration:line-through;border-color:rgba(79,174,125,.4);}
+.chip-btn{cursor:pointer;font-family:'Manrope';color:var(--text);transition:.15s;}
+.chip-btn:hover{border-color:var(--gold);color:var(--gold-bright);background:rgba(212,175,83,.1);}
 .empty{color:var(--text-faint);text-align:center;padding:50px 20px;font-size:14px;border:1px dashed var(--line);border-radius:var(--radius);}
 
 /* ---------- admin gate ---------- */
@@ -559,6 +561,11 @@ td input,td select{padding:7px 9px;font-size:13px;}
 
       <!-- BUILD RESULTS -->
       <div class="admin-view active" id="admin-results">
+        <div class="panel" style="margin-bottom:20px;">
+          <div class="eyebrow" style="margin-bottom:4px;">Most Wanted</div>
+          <p style="color:var(--text-dim);font-size:13px;margin:0 0 14px;">What people still need, across every pending build — highest demand first. Click a name to queue that item for them.</p>
+          <div id="most-wanted-list"></div>
+        </div>
         <div class="board-controls">
           <input type="search" id="board-search" placeholder="Search by character..." oninput="renderAdminBuilds()">
           <select id="board-filter" onchange="renderAdminBuilds()">
@@ -1172,7 +1179,11 @@ function renderAdminBuilds(){
 
   el.innerHTML = list.map(r=>{
     const pve = slotEntries(r.pve), pvp = slotEntries(r.pvp);
-    const chip = e => `<span class="chip ${e.have?'have':''}">${escapeHtml(e.label)}${e.value?': '+escapeHtml(e.value):''}${e.have?' ✓':''}</span>`;
+    const chip = e => {
+      if(e.have) return `<span class="chip have">${escapeHtml(e.label)}${e.value?': '+escapeHtml(e.value):''} ✓</span>`;
+      if(!e.value) return `<span class="chip">${escapeHtml(e.label)}</span>`;
+      return `<button type="button" class="chip chip-btn" onclick="quickAddToQueue('${encodeURIComponent(r.characterName)}','${encodeURIComponent(e.value)}')" title="Add to give-priority queue">${escapeHtml(e.label)}: ${escapeHtml(e.value)} +</button>`;
+    };
     return `
     <div class="req-card">
       <div class="req-card-top">
@@ -1195,6 +1206,63 @@ function renderAdminBuilds(){
       </div>
     </div>`;
   }).join('');
+  renderMostWanted();
+}
+
+/* ============== most wanted ============== */
+function getAllNeededItems(){
+  const out = [];
+  requests.filter(r=>r.status==='pending').forEach(r=>{
+    slotEntries(r.pve).filter(e=>!e.have && e.value).forEach(e=> out.push({item:e.value, character:r.characterName, context:'PvE'}));
+    slotEntries(r.pvp).filter(e=>!e.have && e.value).forEach(e=> out.push({item:e.value, character:r.characterName, context:'PvP'}));
+  });
+  return out;
+}
+function buildMostWanted(){
+  const flat = getAllNeededItems();
+  const groups = {};
+  flat.forEach(e=>{
+    const key = e.item.trim().toLowerCase();
+    if(!groups[key]) groups[key] = { item: e.item.trim(), entries: [] };
+    // avoid double-counting the same character wanting the same item in both PvE and PvP
+    if(!groups[key].entries.some(x=>x.character===e.character)) groups[key].entries.push(e);
+  });
+  return Object.values(groups).sort((a,b)=> b.entries.length - a.entries.length);
+}
+function renderMostWanted(){
+  const el = document.getElementById('most-wanted-list');
+  if(!el) return;
+  const wanted = buildMostWanted().slice(0, 20);
+  if(!wanted.length){ el.innerHTML = '<div class="empty" style="padding:20px;">Nothing outstanding right now.</div>'; return; }
+  const queuedSet = new Set(queue.map(q=>`${q.character}::${q.item}`.toLowerCase()));
+  el.innerHTML = wanted.map(w=>{
+    const chips = w.entries.map(e=>{
+      const already = queuedSet.has(`${e.character}::${w.item}`.toLowerCase());
+      if(already) return `<span class="chip have">${escapeHtml(e.character)} ✓ queued</span>`;
+      return `<button type="button" class="chip chip-btn" onclick="quickAddToQueue('${encodeURIComponent(e.character)}','${encodeURIComponent(w.item)}')">${escapeHtml(e.character)} +</button>`;
+    }).join('');
+    return `<div style="border-bottom:1px solid var(--line-soft);padding:10px 0;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span style="font-family:'Cinzel',serif;font-weight:700;color:var(--gold-bright);">${escapeHtml(w.item)}</span>
+        <span class="badge ${w.entries.length>1?'pending':''}" style="${w.entries.length>1?'':'background:rgba(146,151,171,.15);color:var(--text-dim);border-color:transparent;'}">${w.entries.length} ${w.entries.length===1?'request':'requests'}</span>
+      </div>
+      <div class="chip-row">${chips}</div>
+    </div>`;
+  }).join('');
+}
+async function quickAddToQueue(characterEnc, itemEnc){
+  if(!adminKey){ alert('Log in as an officer first.'); return; }
+  const character = decodeURIComponent(characterEnc);
+  const item = decodeURIComponent(itemEnc);
+  if(queue.some(q=>q.character===character && q.item.toLowerCase()===item.toLowerCase())){
+    alert('Already in the queue.'); return;
+  }
+  queue.push({ id:'q_'+Date.now()+Math.random().toString(36).slice(2,6), character, item, tier:'medium' });
+  const ok = await saveCollection('priority-queue', queue);
+  if(ok){
+    renderQueue(); renderMostWanted(); renderAdminBuilds();
+    notifyDiscord('queue', `**${character}** added to give-priority queue: **${item}** (medium priority) — pulled from their build.`);
+  }
 }
 async function toggleStatus(id){
   const r = requests.find(x=>x.id===id);

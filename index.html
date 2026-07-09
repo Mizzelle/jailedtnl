@@ -704,7 +704,7 @@ td input,td select{padding:7px 9px;font-size:13px;}
             </div>
           </div>
           <div class="field-row">
-            <div class="field"><label>Time (UTC / server time)</label><input type="time" id="tt-time" value="18:00"></div>
+            <div class="field"><label>Time (Eastern — EST/EDT)</label><input type="time" id="tt-time" value="18:00"></div>
             <div class="field"><label>Notes</label><input type="text" id="tt-notes" placeholder="Optional"></div>
           </div>
           <div class="field">
@@ -1532,16 +1532,36 @@ function initDayChecks(){
   document.getElementById('tt-days').innerHTML = DAY_NAMES.map((d,i)=>
     `<span class="day-chip" data-day="${i}" onclick="this.classList.toggle('active')">${d}</span>`).join('');
 }
+/* Eastern Time helpers — DST-aware, mirrors the same logic in worker.js */
+function getEasternOffsetMinutes(utcDate){
+  const dtf = new Intl.DateTimeFormat('en-US', { timeZone:'America/New_York', timeZoneName:'shortOffset' });
+  const part = dtf.formatToParts(utcDate).find(p=>p.type==='timeZoneName')?.value || 'GMT-5';
+  const m = part.match(/GMT([+-]\d+)/);
+  return m ? parseInt(m[1],10)*60 : -300;
+}
+function getEasternDateParts(utcDate){
+  const dtf = new Intl.DateTimeFormat('en-US', { timeZone:'America/New_York', year:'numeric', month:'2-digit', day:'2-digit', weekday:'short' });
+  const parts = dtf.formatToParts(utcDate);
+  const get = t => parts.find(p=>p.type===t).value;
+  const weekdayMap = {Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
+  return { year:parseInt(get('year'),10), month:parseInt(get('month'),10), day:parseInt(get('day'),10), dow:weekdayMap[get('weekday')] };
+}
+function easternWallTimeToUtcMs(year, month, day, hour, minute){
+  let guessMs = Date.UTC(year, month-1, day, hour, minute, 0);
+  for(let i=0;i<2;i++){
+    const offsetMin = getEasternOffsetMinutes(new Date(guessMs));
+    guessMs = Date.UTC(year, month-1, day, hour, minute, 0) - offsetMin*60000;
+  }
+  return guessMs;
+}
 function getTargetDate(){
-  const d = new Date();
-  d.setDate(d.getDate() + dayOffset);
-  return d;
+  const shifted = new Date(Date.now() + dayOffset*24*60*60*1000);
+  return getEasternDateParts(shifted);
 }
 function shiftDay(delta){ dayOffset += delta; renderPublicTimetable(); }
 function renderPublicTimetable(){
-  const target = getTargetDate();
-  const dow = target.getDay();
-  const label = dayOffset===0 ? 'Today' : target.toLocaleDateString(undefined,{weekday:'long', month:'short', day:'numeric'});
+  const { year, month, day, dow } = getTargetDate();
+  const label = dayOffset===0 ? 'Today' : new Date(Date.UTC(year,month-1,day)).toLocaleDateString(undefined,{weekday:'long', month:'short', day:'numeric', timeZone:'UTC'});
   document.getElementById('day-label').textContent = label;
 
   const todays = timetableEvents.filter(e => Array.isArray(e.days) && e.days.includes(dow));
@@ -1550,7 +1570,7 @@ function renderPublicTimetable(){
 
   const withTime = todays.map(e=>{
     const [h,m] = String(e.time||'00:00').split(':').map(Number);
-    const dt = new Date(target.getFullYear(), target.getMonth(), target.getDate(), h||0, m||0);
+    const dt = new Date(easternWallTimeToUtcMs(year, month, day, h||0, m||0));
     return {...e, dt};
   }).sort((a,b)=> a.dt - b.dt);
 
@@ -1571,7 +1591,7 @@ function renderTimetableTable(){
   const sorted = [...timetableEvents].sort((a,b)=> (a.time||'').localeCompare(b.time||''));
   tbody.innerHTML = sorted.map(e=>`
     <tr>
-      <td>${escapeHtml(e.time)} <span style="color:var(--text-faint);">UTC</span></td>
+      <td>${escapeHtml(e.time)} <span style="color:var(--text-faint);">ET</span></td>
       <td><b>${escapeHtml(e.title)}</b></td>
       <td>${escapeHtml(e.category)}</td>
       <td>${(e.days||[]).map(d=>DAY_NAMES[d]).join(', ')}</td>

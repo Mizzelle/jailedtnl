@@ -359,7 +359,7 @@ td input,td select{padding:7px 9px;font-size:13px;}
   <div class="wrap" style="max-width:840px;">
     <div class="eyebrow">Member Submission</div>
     <h2 style="font-size:30px;margin:0 0 8px;">Submit Your Build</h2>
-    <p style="color:var(--text-dim);font-size:14.5px;margin:0 0 24px;">Fill in what you've got and what you still need. Check "Have" if you have already got the item.</p>
+    <p style="color:var(--text-dim);font-size:14.5px;margin:0 0 24px;">Fill in what you've got and what you still need. Leave a field blank if it's not needed, and check "Have" once you've received something.</p>
 
     <div class="panel" style="margin-bottom:16px;">
       <div class="eyebrow" style="margin-bottom:12px;">Already Submitted?</div>
@@ -437,7 +437,7 @@ td input,td select{padding:7px 9px;font-size:13px;}
 
       <div class="panel" style="margin-top:16px;">
         <div class="eyebrow" style="margin-bottom:6px;">Build Totals</div>
-        <p style="color:var(--text-dim);font-size:13px;margin:0 0 16px;">Fill these in estimated for when build is complete — the totals shown on your character sheet.</p>
+        <p style="color:var(--text-dim);font-size:13px;margin:0 0 16px;">Fill these in once your build is complete — the totals shown on your character sheet.</p>
         <div class="stat-total-grid" id="stat-totals"></div>
       </div>
 
@@ -479,7 +479,7 @@ td input,td select{padding:7px 9px;font-size:13px;}
   <div class="wrap">
     <div class="eyebrow">Guild-Wide<span class="diamond">✦</span>Read Only</div>
     <h2 style="font-size:30px;margin:0 0 8px;">Statics</h2>
-    <p style="color:var(--text-dim);font-size:14.5px;margin:0 0 24px;max-width:600px;">Statics</p>
+    <p style="color:var(--text-dim);font-size:14.5px;margin:0 0 24px;max-width:600px;">Twelve statics, six spots each. Officers build these in Admin — this view is for everyone to check where they land.</p>
     <div class="role-legend">
       <span class="legend-item"><span class="legend-dot role-dps"></span>DPS</span>
       <span class="legend-item"><span class="legend-dot role-healer"></span>Healer</span>
@@ -607,6 +607,7 @@ td input,td select{padding:7px 9px;font-size:13px;}
           Members can also add to this queue directly from Discord using <b style="color:var(--gold);">/request</b> — one-time setup below.
           <div class="link-btns">
             <button class="btn btn-sm" onclick="registerDiscordCommand()">Register /request Command</button>
+            <button class="btn btn-sm" onclick="checkDiscordCommands()">Check Registered Commands</button>
           </div>
           <div id="discord-cmd-status" style="display:none;margin-top:10px;font-weight:700;"></div>
         </div>
@@ -1299,6 +1300,31 @@ async function registerDiscordCommand(){
     const data = await res.json();
     if(res.ok && data.ok){ status.style.color='#8fe3b6'; status.textContent = '✓ /request is registered — it can take up to an hour to show up in Discord the first time.'; }
     else { status.style.color='var(--bad)'; status.textContent = 'Failed: ' + (data.error || JSON.stringify(data.data || data)); }
+  }catch(e){
+    status.style.color='var(--bad)'; status.textContent = "Couldn't reach the worker.";
+  }
+}
+async function checkDiscordCommands(){
+  if(!adminKey){ alert('Log in as an officer first.'); return; }
+  const status = document.getElementById('discord-cmd-status');
+  status.style.display='block'; status.style.color='var(--text-dim)'; status.textContent = 'Checking…';
+  try{
+    const res = await fetch(WORKER_URL.replace(/\/$/,'') + '/list-commands', {
+      headers:{ 'X-Admin-Key': adminKey }
+    });
+    const data = await res.json();
+    if(!res.ok || !data.ok){ status.style.color='var(--bad)'; status.textContent = 'Failed: ' + (data.error || JSON.stringify(data.data || data)); return; }
+    const commands = Array.isArray(data.data) ? data.data : [];
+    const hasRequest = commands.some(c => c.name === 'request');
+    if(hasRequest){
+      status.style.color='#8fe3b6';
+      status.textContent = '✓ Discord confirms /request is registered. If it still is not showing when you type it, double check the bot was actually invited to your server (Part 4 in the README) — registering a command and inviting the bot are separate steps.';
+    } else {
+      status.style.color='var(--bad)';
+      status.textContent = commands.length
+        ? `Discord has ${commands.length} command(s) registered, but none named "request". Try Register /request Command again.`
+        : 'Discord has no commands registered yet for this application. Click Register /request Command first.';
+    }
   }catch(e){
     status.style.color='var(--bad)'; status.textContent = "Couldn't reach the worker.";
   }

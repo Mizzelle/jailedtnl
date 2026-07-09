@@ -597,6 +597,13 @@ td input,td select{padding:7px 9px;font-size:13px;}
 
       <!-- PRIORITY QUEUE -->
       <div class="admin-view" id="admin-queue">
+        <div class="note">
+          Members can also add to this queue directly from Discord using <b style="color:var(--gold);">/request</b> — one-time setup below.
+          <div class="link-btns">
+            <button class="btn btn-sm" onclick="registerDiscordCommand()">Register /request Command</button>
+          </div>
+          <div id="discord-cmd-status" style="display:none;margin-top:10px;font-weight:700;"></div>
+        </div>
         <div class="panel">
           <div class="eyebrow" style="margin-bottom:14px;">Add to Give-List</div>
           <div class="mini-form">
@@ -611,7 +618,7 @@ td input,td select{padding:7px 9px;font-size:13px;}
         <div class="panel">
           <div class="eyebrow" style="margin-bottom:12px;">Give Priority — drag to reorder</div>
           <div class="queue-list" id="queue-list"></div>
-          <div class="empty" id="queue-empty" style="display:none;">Nothing queued yet. Add items above, or pull from pending builds in Build Results.</div>
+          <div class="empty" id="queue-empty" style="display:none;">Nothing queued yet. Add items above, pull from pending builds in Build Results, or wait for a Discord /request.</div>
         </div>
       </div>
 
@@ -1187,6 +1194,21 @@ function renderLoot(){
 }
 
 /* ============== priority queue (drag & drop) ============== */
+async function registerDiscordCommand(){
+  if(!adminKey){ alert('Log in as an officer first.'); return; }
+  const status = document.getElementById('discord-cmd-status');
+  status.style.display='block'; status.style.color='var(--text-dim)'; status.textContent = 'Registering…';
+  try{
+    const res = await fetch(WORKER_URL.replace(/\/$/,'') + '/register-commands', {
+      method:'POST', headers:{ 'X-Admin-Key': adminKey }
+    });
+    const data = await res.json();
+    if(res.ok && data.ok){ status.style.color='#8fe3b6'; status.textContent = '✓ /request is registered — it can take up to an hour to show up in Discord the first time.'; }
+    else { status.style.color='var(--bad)'; status.textContent = 'Failed: ' + (data.error || JSON.stringify(data.data || data)); }
+  }catch(e){
+    status.style.color='var(--bad)'; status.textContent = "Couldn't reach the worker.";
+  }
+}
 async function addQueue(){
   const character = document.getElementById('q-char').value.trim();
   const item = document.getElementById('q-item').value.trim();

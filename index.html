@@ -498,6 +498,12 @@ td input,td select{padding:7px 9px;font-size:13px;}
     <p style="color:var(--text-dim);font-size:14.5px;margin:0 0 26px;max-width:640px;">Live boss and event timers on top, sourced from the community companion app. Guild-specific events — raid nights, wars, static runs — below, maintained by officers.</p>
 
     <div class="section-head" style="margin:0 0 14px;">
+      <h2 style="font-size:18px;">Sign-Ups</h2>
+      <p>Raid Helper sign-up channels, maintained by officers.</p>
+    </div>
+    <div id="signup-links-list" style="margin-bottom:36px;"></div>
+
+    <div class="section-head" style="margin:0 0 14px;">
       <h2 style="font-size:18px;">Live Boss &amp; Event Timers</h2>
       <p>Maintained by the T&amp;L Companion app, not by us — it doesn't allow embedding, so it opens in its own tab.</p>
     </div>
@@ -675,6 +681,21 @@ td input,td select{padding:7px 9px;font-size:13px;}
         </div>
 
         <div class="panel" style="margin-bottom:16px;">
+          <div class="eyebrow" style="margin-bottom:14px;">Sign-Up Links</div>
+          <p style="color:var(--text-dim);font-size:13px;margin:0 0 14px;">Add as many Raid Helper (or other) sign-up channels as you need — they'll all show on the public Timetable tab.</p>
+          <div class="mini-form">
+            <div class="field"><label>Label</label><input type="text" id="su-label" placeholder="e.g. Thursday Raid Sign-Up"></div>
+            <div class="field" style="flex:2;"><label>Discord Channel Link</label><input type="text" id="su-url" placeholder="https://discord.com/channels/..."></div>
+            <button class="btn btn-primary" onclick="saveSignupLink()" id="su-save-btn">Add Link</button>
+            <button class="btn btn-sm" onclick="resetSignupForm()" id="su-cancel-btn" style="display:none;">Cancel Edit</button>
+          </div>
+        </div>
+        <div class="panel" style="margin-bottom:16px;">
+          <div class="eyebrow" style="margin-bottom:12px;">Current Links</div>
+          <div id="admin-signup-list" class="req-list"></div>
+        </div>
+
+        <div class="panel" style="margin-bottom:16px;">
           <div class="eyebrow" style="margin-bottom:14px;">Add Event</div>
           <div class="field-row">
             <div class="field"><label>Title</label><input type="text" id="tt-title" placeholder="e.g. Kowazan's Peak Field Boss"></div>
@@ -728,6 +749,7 @@ const COLLECTION_AUTH = {
   'priority-queue':  { read: 'admin',  write: 'admin' },
   'statics':         { read: 'public', write: 'admin' },
   'player-stats':    { read: 'admin',  write: 'admin' },
+  'signup-links':    { read: 'public', write: 'admin' },
 };
 const STAT_FIELDS = [
   {key:'hit', label:'Hit'},
@@ -748,6 +770,7 @@ let privateRequests = [];
 let pendingCores = [];
 let editingId = null;
 let statics = [];
+let signupLinks = [];
 let dragPayload = null;
 const STATIC_COUNT = 12;
 const STATIC_SIZE = 6;
@@ -814,16 +837,18 @@ async function saveCollection(name, data){
 
 /* ============== load everything ============== */
 async function loadAll(){
-  [requests, privateRequests, statics] = await Promise.all([
+  [requests, privateRequests, statics, signupLinks] = await Promise.all([
     loadCollection('requests'),
     loadCollection('private-requests'),
     loadCollection('statics'),
+    loadCollection('signup-links'),
   ]);
   if(!statics || statics.length===0){
     statics = Array.from({length:STATIC_COUNT}, (_,i)=>({ label:'Static '+(i+1), members: Array(STATIC_SIZE).fill(null) }));
   }
   renderAdminBuilds(); renderPrivateList(); renderCharList();
   renderPublicStatics(); renderAdminStatics();
+  renderSignupLinks(); renderAdminSignupLinks();
 }
 async function loadAdminOnlyData(){
   [lootLog, queue, playerStats] = await Promise.all([
@@ -834,6 +859,75 @@ async function loadAdminOnlyData(){
   renderLoot(); renderQueue(); renderStats(); renderCharList(); renderAdminStatics();
 }
 async function saveStatics(){ return saveCollection('statics', statics); }
+
+/* ============== sign-up links ============== */
+let editingSignupId = null;
+async function saveSignupLinks(){ return saveCollection('signup-links', signupLinks); }
+function renderSignupLinks(){
+  const el = document.getElementById('signup-links-list');
+  if(!el) return;
+  if(!signupLinks.length){ el.innerHTML = '<div class="empty">No sign-ups posted yet.</div>'; return; }
+  el.innerHTML = signupLinks.map(l => `
+    <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener" class="panel" style="display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:12px;text-decoration:none;color:inherit;">
+      <div style="font-family:'Cinzel',serif;font-weight:700;font-size:15.5px;color:var(--gold-bright);">${escapeHtml(l.label)}</div>
+      <span class="btn btn-primary btn-sm" style="white-space:nowrap;">Open ↗</span>
+    </a>`).join('');
+}
+function renderAdminSignupLinks(){
+  const el = document.getElementById('admin-signup-list');
+  if(!el) return;
+  if(!signupLinks.length){ el.innerHTML = '<div class="empty">No links added yet.</div>'; return; }
+  el.innerHTML = signupLinks.map(l => `
+    <div class="req-card">
+      <div class="req-card-top">
+        <div>
+          <div class="req-name" style="font-size:15px;">${escapeHtml(l.label)}</div>
+          <div class="req-meta" style="word-break:break-all;">${escapeHtml(l.url)}</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm" onclick="editSignupLink('${l.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteSignupLink('${l.id}')">Delete</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+async function saveSignupLink(){
+  if(!adminKey){ alert('Log in as an officer first.'); return; }
+  const label = document.getElementById('su-label').value.trim();
+  const url = document.getElementById('su-url').value.trim();
+  if(!label || !url){ alert('Label and link are both required.'); return; }
+  if(editingSignupId){
+    const idx = signupLinks.findIndex(l=>l.id===editingSignupId);
+    if(idx>=0) signupLinks[idx] = { ...signupLinks[idx], label, url };
+  } else {
+    signupLinks.push({ id:'su_'+Date.now(), label, url });
+  }
+  const ok = await saveSignupLinks();
+  if(ok){ renderSignupLinks(); renderAdminSignupLinks(); resetSignupForm(); }
+}
+function editSignupLink(id){
+  const l = signupLinks.find(x=>x.id===id);
+  if(!l) return;
+  editingSignupId = id;
+  document.getElementById('su-label').value = l.label;
+  document.getElementById('su-url').value = l.url;
+  document.getElementById('su-save-btn').textContent = 'Save Changes';
+  document.getElementById('su-cancel-btn').style.display = 'inline-block';
+}
+async function deleteSignupLink(id){
+  if(!adminKey){ alert('Log in as an officer first.'); return; }
+  if(!confirm('Delete this sign-up link?')) return;
+  signupLinks = signupLinks.filter(x=>x.id!==id);
+  const ok = await saveSignupLinks();
+  if(ok){ renderSignupLinks(); renderAdminSignupLinks(); }
+}
+function resetSignupForm(){
+  document.getElementById('su-label').value = '';
+  document.getElementById('su-url').value = '';
+  editingSignupId = null;
+  document.getElementById('su-save-btn').textContent = 'Add Link';
+  document.getElementById('su-cancel-btn').style.display = 'none';
+}
 
 /* ============== nav ============== */
 function goto(view){
